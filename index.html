@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verbum — Classical Text Translation & Syntax Workbench</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <div>
+        <div class="brand">Verbum</div>
+        <div class="brand-sub">Classical Text Workbench & Philological Suite</div>
+      </div>
+      <button class="btn-ghost hidden" id="btn-return-home">← Back to Setup</button>
+    </header>
+
+    <div id="view-setup" class="panel">
+      <h2>New Text Session</h2>
+      <p style="font-size: 13px; color: var(--ink-soft); margin-bottom: 16px;">Paste your Latin or Ancient Greek passage and an optional reference translation below to begin.</p>
+      
+      <div style="margin-bottom: 14px;">
+        <label style="font-family:'IBM Plex Mono',monospace; font-size:11px; display:block; margin-bottom:6px; color:var(--ink-soft);">Passage Title / Author</label>
+        <input type="text" id="input-title" placeholder="e.g., Vergil, Aeneid Book 1.1-7">
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <label style="font-family:'IBM Plex Mono',monospace; font-size:11px; display:block; margin-bottom:6px; color:var(--ink-soft);">Language</label>
+        <select id="input-lang">
+          <option value="la">Latin</option>
+          <option value="grc">Ancient Greek</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <label style="font-family:'IBM Plex Mono',monospace; font-size:11px; display:block; margin-bottom:6px; color:var(--ink-soft);">Source Text (Sentences will be auto-parsed)</label>
+        <textarea id="input-text" rows="6" placeholder="Arma virumque cano, Troiae qui primus ab oris..."></textarea>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label style="font-family:'IBM Plex Mono',monospace; font-size:11px; display:block; margin-bottom:6px; color:var(--ink-soft);">Reference Translation (Optional)</label>
+        <textarea id="input-reftrans" rows="4" placeholder="Of arms and the man I sing, who first from the coasts of Troy..."></textarea>
+      </div>
+
+      <button class="btn" id="btn-start-session">Initialize Workbench →</button>
+    </div>
+
+    <div id="view-practice" class="hidden">
+      
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div>SESSION TIME</div>
+          <div class="stat-value" id="stat-time">0m 0s</div>
+        </div>
+        <div class="stat-card">
+          <div>TOTAL WORDS</div>
+          <div class="stat-value" id="stat-words">0</div>
+        </div>
+        <div class="stat-card">
+          <div>SYNTAX LINKS</div>
+          <div class="stat-value" id="stat-links">0</div>
+        </div>
+      </div>
+
+      <div class="nav-strip">
+        <div><strong id="session-title-display" style="color:var(--ink)">Passage</strong></div>
+        <div id="sentence-counter">Sentence 1 of 1</div>
+      </div>
+
+      <div class="panel">
+        <div class="sentence-card" id="active-sentence-card">
+          </div>
+
+        <div style="margin-bottom: 16px; display: flex; gap: 10px; align-items: center;">
+          <button class="btn-ghost" id="btn-toggle-interlinear" style="font-size: 12px; padding: 6px 14px;">🔤 Interlinear Studio Mode</button>
+          <span style="font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-faint);" id="interlinear-status">Off</span>
+        </div>
+        <div class="interlinear-container hidden" id="interlinear-container">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--verdigris); text-transform:uppercase; font-weight:600;">Word-by-Word Interlinear Glosses</span>
+            <span style="font-family:'IBM Plex Mono', monospace; font-size:10px; color:var(--ink-faint);">Type gloss notes directly under each word</span>
+          </div>
+          <div class="interlinear-rows-wrapper" id="interlinear-rows-list"></div>
+          <div class="interlinear-footer-action">
+            <button class="btn-ghost" id="btn-save-interlinear" style="font-size:11px;">Save Gloss Notes 💾</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <button class="btn-ghost" id="btn-toggle-syntax" style="font-size: 12px; padding: 6px 14px;">🌲 Visual Syntax Canvas</button>
+          <span style="font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-faint);" id="syntax-status">Click a word, then click its head word</span>
+        </div>
+        <div class="syntax-tree-panel hidden" id="syntax-tree-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); text-transform:uppercase;">Interactive Dependency Map</span>
+            <button class="btn-ghost" id="syntax-clear-links" style="font-size:11px;">Clear All Links ✕</button>
+          </div>
+          <div class="syntax-canvas" id="syntax-canvas">
+            </div>
+          <div id="syntax-links-list" style="font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); display:flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="font-family:'IBM Plex Mono', monospace; font-size:11px; display:block; margin-bottom:6px; color:var(--ink-soft);">Your Translation (Sentence Level)</label>
+          <textarea id="user-translation-input" rows="3" placeholder="Draft your idiomatic translation for this sentence here..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-ghost" id="btn-prev-sentence">← Previous</button>
+            <button class="btn-ghost" id="btn-next-sentence">Next →</button>
+          </div>
+          <button class="btn" id="btn-save-translation">Save Draft</button>
+        </div>
+      </div>
+
+      <div class="panel" id="reference-panel" style="display:none;">
+        <span style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--bronze); text-transform:uppercase; display:block; margin-bottom:4px;">Reference Translation</span>
+        <p id="reference-text-display" style="font-style:italic; font-family:'Cardo', serif; font-size: 16px; color: var(--ink-soft);"></p>
+      </div>
+
+      <div class="panel hidden" id="completion-panel" style="border-color: var(--verdigris);">
+        <span style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--verdigris); text-transform:uppercase; display:block; margin-bottom:6px; font-weight:600;">🎉 Passage Complete — Summary & Collation</span>
+        
+        <h3 style="font-family:'Cardo', serif; font-size: 20px; margin-bottom: 8px;">Full Passage Translation</h3>
+        <div class="collation-box" id="full-collation-text"></div>
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px;">
+          <button class="btn" id="btn-copy-collation">Copy Full Translation 📋</button>
+          <button class="btn-ghost" id="btn-export-markdown">Export Markdown Report 📄</button>
+          <button class="btn-ghost" id="btn-export-anki">Export Anki CSV ⚡</button>
+        </div>
+
+        <h3 style="font-family:'Cardo', serif; font-size: 20px; margin-bottom: 6px;">End-of-Passage Auto Glossary</h3>
+        <p style="font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-faint); margin-bottom: 12px;">
+          All unique words across this passage with quick links to Logeion.
+        </p>
+        <div id="end-glossary-list" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="word-color-menu">Color Palette</div>
+
+  <script src="app.js"></script>
+</body>
+</html>
