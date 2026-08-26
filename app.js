@@ -16,6 +16,8 @@
   var syntaxModeActive = false;
   var syntaxSourceWord = null;
   var timerInterval = null;
+  var hasUnsavedTranslation = false;
+  var hasUnsavedGloss = false;
 
   function escapeHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -25,7 +27,6 @@
     try { localStorage.setItem('verbum_state_full', JSON.stringify(state)); } catch(e){}
   }
 
-  // Auto-extract unique words across entire passage
   function getAutoParsedGlossary() {
     var fullText = state.sentences.join(' ');
     var tokens = fullText.match(/[\p{L}\p{M}]+/gu) || [];
@@ -43,7 +44,6 @@
     });
   }
 
-  // Start Session Timer
   function renderTimeDisplay() {
     var m = Math.floor(state.secondsElapsed / 60);
     var s = state.secondsElapsed % 60;
@@ -53,23 +53,24 @@
 
   function startTimer() {
     if(timerInterval) clearInterval(timerInterval);
-    renderTimeDisplay(); // paint restored/current value immediately, don't wait for first tick
+    renderTimeDisplay();
     timerInterval = setInterval(function(){
       state.secondsElapsed++;
       renderTimeDisplay();
-      // Persist periodically so elapsed time survives a refresh/crash,
-      // not just when some other action happens to call persist().
+
       if(state.secondsElapsed % 5 === 0) persist();
     }, 1000);
   }
 
-  // Catch the remainder of elapsed time (<5s since the last periodic save)
-  // when the user navigates away or closes the tab.
-  window.addEventListener('beforeunload', function(){
+  window.addEventListener('beforeunload', function(e){
     if(timerInterval) persist();
+    if(hasUnsavedTranslation || hasUnsavedGloss) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
   });
 
-  // Session initialization
   document.getElementById('btn-start-session').addEventListener('click', function(){
     var title = document.getElementById('input-title').value.trim() || 'Untitled Passage';
     var lang = document.getElementById('input-lang').value;
@@ -87,12 +88,16 @@
     var refSentences = rawRef ? (rawRef.match(/[^.!?]+[.!?]+(\s|$)/g) || [rawRef]) : [];
     refSentences = refSentences.map(function(s){ return s.trim(); });
 
+    var refMismatch = refSentences.length > 0 && refSentences.length !== sentences.length;
+
     state = {
       title: title,
       lang: lang,
       sentences: sentences,
       translations: new Array(sentences.length).fill(''),
       refTranslations: refSentences,
+      refMismatch: refMismatch,
+      refFullText: rawRef,
       wordColors: {},
       syntaxLinks: {},
       interlinearNotes: {},
@@ -150,7 +155,10 @@
         var span = document.createElement('span');
         span.className = 'word';
         span.textContent = token;
-        
+        span.setAttribute('tabindex', '0');
+        span.setAttribute('role', 'button');
+        span.setAttribute('aria-label', 'Word: ' + token + '. Activate to set a highlight color.');
+
         var wordKey = state.current + '_' + wordIndexCounter;
         span.setAttribute('data-word-key', wordKey);
 
@@ -170,7 +178,6 @@
     document.getElementById('sentence-counter').textContent = 'Sentence ' + (state.current + 1) + ' of ' + state.sentences.length;
     document.getElementById('user-translation-input').value = state.translations[state.current] || '';
 
-    // Navigation button states
     document.getElementById('btn-prev-sentence').disabled = (state.current === 0);
     var nextBtn = document.getElementById('btn-next-sentence');
     if (state.current === state.sentences.length - 1) {
@@ -181,7 +188,6 @@
       nextBtn.textContent = 'Next →';
     }
 
-    // Completion Panel on last sentence
     var completionPanel = document.getElementById('completion-panel');
     if (state.current === state.sentences.length - 1) {
       renderCompletionSummary();
@@ -192,7 +198,11 @@
 
     var refPanel = document.getElementById('reference-panel');
     var refDisplay = document.getElementById('reference-text-display');
-    if(state.refTranslations && state.refTranslations[state.current]) {
+    if(state.refMismatch) {
+
+      refDisplay.innerHTML = '<span style="display:block; font-family:\'IBM Plex Mono\',monospace; font-size:10px; color:var(--rubric); font-style:normal; margin-bottom:8px;">⚠ This reference translation has ' + state.refTranslations.length + ' segment(s) but the passage has ' + state.sentences.length + ' sentence(s), so per-sentence alignment isn\'t reliable — showing the full reference text instead.</span>' + escapeHtml(state.refFullText);
+      refPanel.style.display = 'block';
+    } else if(state.refTranslations && state.refTranslations[state.current]) {
       refDisplay.textContent = state.refTranslations[state.current];
       refPanel.style.display = 'block';
     } else {
@@ -233,6 +243,14 @@
     });
   }
 
+  function sanitizeFilename(str) {
+    return str
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'Untitled';
+  }
+
   document.getElementById('btn-copy-collation').addEventListener('click', function(){
     var collationBox = document.getElementById('full-collation-text');
     navigator.clipboard.writeText(collationBox.textContent).then(function(){
@@ -247,8 +265,9 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = state.title.replace(/\s+/g, '_') + '_Verbum_Report.md';
+    a.download = sanitizeFilename(state.title) + '_Verbum_Report.md';
     a.click();
+    URL.revokeObjectURL(url);
   });
 
   document.getElementById('btn-export-anki').addEventListener('click', function(){
@@ -264,8 +283,9 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = state.title.replace(/\s+/g, '_') + '_Anki_Cards.csv';
+    a.download = sanitizeFilename(state.title) + '_Anki_Cards.csv';
     a.click();
+    URL.revokeObjectURL(url);
   });
 
   function rebindWordEvents() {
@@ -284,22 +304,27 @@
         var wordKey = this.getAttribute('data-word-key');
         openColorMenu(this.textContent, wordKey, rect.left + (rect.width / 2), rect.top);
       };
+      span.onkeydown = function(e){
+        if(e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.click();
+        }
+      };
     });
   }
 
-  // Word Color Palette Popover Menu
   function openColorMenu(word, wordKey, clientX, clientY) {
     var logeionUrl = 'https://logeion.uchicago.edu/' + encodeURIComponent(word);
 
     var contentHtml = '<div style="font-family:\'Cardo\'; font-size:16px; font-weight:bold; color:var(--ink); margin-bottom:2px;">' + escapeHtml(word) + '</div>' +
                       '<div style="font-size:10px; color:var(--ink-soft); margin-bottom:6px;">Highlight Color:</div>' +
                       '<div class="color-swatch-grid">' +
-                        '<button class="color-btn" data-val="red" title="Red"></button>' +
-                        '<button class="color-btn" data-val="green" title="Green"></button>' +
-                        '<button class="color-btn" data-val="blue" title="Blue"></button>' +
-                        '<button class="color-btn" data-val="yellow" title="Yellow"></button>' +
-                        '<button class="color-btn" data-val="bronze" title="Bronze"></button>' +
-                        '<button class="color-btn" data-val="purple" title="Purple"></button>' +
+                        '<button class="color-btn" data-val="red" title="Red" aria-label="Highlight red"></button>' +
+                        '<button class="color-btn" data-val="green" title="Green" aria-label="Highlight green"></button>' +
+                        '<button class="color-btn" data-val="blue" title="Blue" aria-label="Highlight blue"></button>' +
+                        '<button class="color-btn" data-val="yellow" title="Yellow" aria-label="Highlight yellow"></button>' +
+                        '<button class="color-btn" data-val="bronze" title="Bronze" aria-label="Highlight bronze"></button>' +
+                        '<button class="color-btn" data-val="purple" title="Purple" aria-label="Highlight purple"></button>' +
                       '</div>' +
                       '<button class="btn-ghost" id="clear-color-btn" style="width:100%; font-size:10px; padding:3px 0; margin-bottom:6px;">Clear Highlight ✕</button>' +
                       '<a class="logeion-link" href="' + logeionUrl + '" target="_blank">Open in Logeion ↗</a>';
@@ -367,7 +392,22 @@
     }
   });
 
-  // Interlinear Studio Handlers
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Escape') return;
+
+    var menu = document.getElementById('word-color-menu');
+    if(menu && menu.style.display === 'block') {
+      menu.style.display = 'none';
+      document.querySelectorAll('.word.picked').forEach(function(w){ w.classList.remove('picked'); });
+    }
+
+    if(syntaxSourceWord) {
+      clearSyntaxSourceHighlight();
+      var statusEl = document.getElementById('syntax-status');
+      if(statusEl) statusEl.textContent = 'Cancelled selection.';
+    }
+  });
+
   document.getElementById('btn-toggle-interlinear').addEventListener('click', function(){
     interlinearActive = !interlinearActive;
     var container = document.getElementById('interlinear-container');
@@ -427,9 +467,15 @@
       var idx = input.getAttribute('data-word-idx');
       state.interlinearNotes[state.current][idx] = input.value.trim();
     });
+    hasUnsavedGloss = false;
   }
 
-  // Visual Syntax Tree Canvas Handlers
+  document.getElementById('interlinear-rows-list').addEventListener('input', function(e){
+    if(e.target.classList.contains('interlinear-custom-gloss')) {
+      hasUnsavedGloss = true;
+    }
+  });
+
   document.getElementById('btn-toggle-syntax').addEventListener('click', function(){
     syntaxModeActive = !syntaxModeActive;
     var panel = document.getElementById('syntax-tree-panel');
@@ -506,6 +552,9 @@
       var badge = document.createElement('div');
       badge.className = 'syntax-node-badge';
       badge.textContent = w;
+      badge.setAttribute('tabindex', '0');
+      badge.setAttribute('role', 'button');
+      badge.setAttribute('aria-label', 'Syntax node: ' + w + '. Activate to select as dependent or head word.');
       var posX = stepX * (idx + 1);
       badge.style.left = posX + 'px';
       badge.style.bottom = '16px';
@@ -537,6 +586,12 @@
           updateDashboardStats();
           clearSyntaxSourceHighlight();
           document.getElementById('syntax-status').textContent = 'Link mapped successfully!';
+        }
+      };
+      badge.onkeydown = function(e){
+        if(e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          badge.click();
         }
       };
 
@@ -577,11 +632,19 @@
     });
   }
 
-  // Navigation & Saving
-  document.getElementById('btn-save-translation').addEventListener('click', function(){
-    if(interlinearActive) collectInterlinearInputs();
+  function collectTranslationDraft() {
     var draft = document.getElementById('user-translation-input').value;
     state.translations[state.current] = draft;
+    hasUnsavedTranslation = false;
+  }
+
+  document.getElementById('user-translation-input').addEventListener('input', function(){
+    hasUnsavedTranslation = true;
+  });
+
+  document.getElementById('btn-save-translation').addEventListener('click', function(){
+    if(interlinearActive) collectInterlinearInputs();
+    collectTranslationDraft();
     persist();
     
     if (state.current === state.sentences.length - 1) {
@@ -593,6 +656,8 @@
   document.getElementById('btn-prev-sentence').addEventListener('click', function(){
     if(state.current > 0) {
       if(interlinearActive) collectInterlinearInputs();
+      collectTranslationDraft();
+      persist();
       state.current--;
       renderSentence();
     }
@@ -601,12 +666,13 @@
   document.getElementById('btn-next-sentence').addEventListener('click', function(){
     if(state.current < state.sentences.length - 1) {
       if(interlinearActive) collectInterlinearInputs();
+      collectTranslationDraft();
+      persist();
       state.current++;
       renderSentence();
     }
   });
 
-  // Resume state on page load
   try {
     var saved = localStorage.getItem('verbum_state_full');
     if(saved) {
