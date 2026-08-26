@@ -13,7 +13,6 @@
   --bronze: #D1A166;
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 
-  /* Highlight Colors */
   --hl-red: rgba(217, 107, 89, 0.35);
   --hl-green: rgba(88, 140, 126, 0.35);
   --hl-blue: rgba(90, 140, 190, 0.35);
@@ -123,7 +122,6 @@ textarea:focus, input:focus, select:focus {
 .btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
 .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* Top Stats Bar */
 .stats-bar {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -146,7 +144,6 @@ textarea:focus, input:focus, select:focus {
   margin-top: 2px;
 }
 
-/* Sentence Workspace */
 .sentence-card {
   font-family: 'Cardo', serif;
   font-size: 24px;
@@ -167,9 +164,9 @@ textarea:focus, input:focus, select:focus {
   transition: background 0.15s, color 0.15s;
 }
 .word:hover { outline: 1px solid var(--verdigris); }
+.word:focus-visible { outline: 2px solid var(--verdigris); outline-offset: 1px; }
 .word.picked { outline: 2px solid var(--rubric); }
 
-/* Word Color Highlights */
 .word[data-color="red"] { background: var(--hl-red); }
 .word[data-color="green"] { background: var(--hl-green); }
 .word[data-color="blue"] { background: var(--hl-blue); }
@@ -187,7 +184,6 @@ textarea:focus, input:focus, select:focus {
   color: var(--ink-soft);
 }
 
-/* Floating Color Highlight Menu */
 #word-color-menu {
   position: fixed;
   background: var(--paper);
@@ -238,7 +234,6 @@ textarea:focus, input:focus, select:focus {
 }
 .logeion-link:hover { text-decoration: underline; color: var(--ink); }
 
-/* Columnar Interlinear Mode */
 .interlinear-container {
   display: flex;
   flex-direction: column;
@@ -295,7 +290,6 @@ textarea:focus, input:focus, select:focus {
   padding-top: 12px;
 }
 
-/* Visual Syntax Tree Panel */
 .syntax-tree-panel {
   background: var(--paper-dim);
   border: 1px solid var(--line);
@@ -331,8 +325,8 @@ textarea:focus, input:focus, select:focus {
   z-index: 2;
 }
 .syntax-node-badge:hover { background: var(--verdigris-dark); }
+.syntax-node-badge:focus-visible { outline: 2px solid var(--verdigris); outline-offset: 2px; }
 
-/* End-of-Passage Glossary Items */
 .glossary-item {
   display: flex;
   justify-content: space-between;
@@ -344,7 +338,6 @@ textarea:focus, input:focus, select:focus {
 }
 .glossary-term { font-family: 'Cardo', serif; font-size: 17px; font-weight: bold; color: var(--ink); }
 
-/* Final Collation Complete View */
 .collation-box {
   font-family: 'Cardo', serif;
   font-size: 18px;
